@@ -174,6 +174,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "Basic API structure is implemented with FastAPI. The server has a proper API router with /api prefix and CORS middleware."
+      - working: true
+        agent: "testing"
+        comment: "Tested the root endpoint (/api/) and it returns the expected response with status code 200."
 
   - task: "MongoDB Integration"
     implemented: true
@@ -186,6 +189,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "MongoDB integration is implemented and working. The server connects to MongoDB using the MONGO_URL from environment variables."
+      - working: true
+        agent: "testing"
+        comment: "Tested the status check endpoints (/api/status) which use MongoDB. Successfully created a status check and retrieved the list of status checks."
 
 frontend:
   - task: "Landing Page"
