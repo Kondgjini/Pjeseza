@@ -216,6 +216,8 @@ const Dashboard = () => {
   const [clips, setClips] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateClip, setShowCreateClip] = useState(false);
+  const [showVideoEditor, setShowVideoEditor] = useState(false);
+  const [currentVideoData, setCurrentVideoData] = useState(null);
 
   const fetchClips = async () => {
     try {
@@ -236,22 +238,35 @@ const Dashboard = () => {
   }, [user]);
 
   const handleCreateClip = async (videoData) => {
-    try {
-      setLoading(true);
-      const response = await axios.post(`${API_BASE_URL}/api/video/clip`, {
-        youtube_url: videoData.url,
-        clip_name: `Clip from ${videoData.videoInfo.title}`,
-        start_time: 0,
-        end_time: Math.min(60, videoData.videoInfo.duration) // First 60 seconds or full video
-      });
+    setCurrentVideoData(videoData);
+    setShowCreateClip(false);
+    setShowVideoEditor(true);
+  };
 
-      toast.success('Clip created successfully!');
-      fetchClips(); // Refresh clips list
-      setShowCreateClip(false);
+  const handleVideoEditorBack = () => {
+    setShowVideoEditor(false);
+    setCurrentVideoData(null);
+    fetchClips(); // Refresh clips list
+  };
+
+  const downloadClip = async (clipId) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/video/download/${clipId}`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `clip_${clipId}.txt`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Download started!');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to create clip');
-    } finally {
-      setLoading(false);
+      toast.error('Download failed: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -264,6 +279,10 @@ const Dashboard = () => {
         </div>
       </div>
     );
+  }
+
+  if (showVideoEditor && currentVideoData) {
+    return <VideoEditor videoData={currentVideoData} onBack={handleVideoEditorBack} />;
   }
 
   return (
@@ -323,7 +342,7 @@ const Dashboard = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">AI Features Used</p>
-                <p className="text-2xl font-bold text-gray-900">{clips.length * 3}</p>
+                <p className="text-2xl font-bold text-gray-900">{clips.reduce((total, clip) => total + (clip.applied_features?.length || 0), 0)}</p>
               </div>
             </div>
           </div>
@@ -373,6 +392,12 @@ const Dashboard = () => {
                           {clip.start_time}s - {clip.end_time || 'End'}s
                         </span>
                         <span>Created {new Date(clip.created_at).toLocaleDateString()}</span>
+                        {clip.applied_features && clip.applied_features.length > 0 && (
+                          <span className="flex items-center">
+                            <Sparkles className="w-3 h-3 mr-1" />
+                            {clip.applied_features.length} AI features
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -384,7 +409,10 @@ const Dashboard = () => {
                         {clip.status}
                       </span>
                       {clip.status === 'completed' && (
-                        <button className="text-blue-500 hover:text-blue-600">
+                        <button 
+                          onClick={() => downloadClip(clip.id)}
+                          className="text-blue-500 hover:text-blue-600"
+                        >
                           <Download className="w-4 h-4" />
                         </button>
                       )}
