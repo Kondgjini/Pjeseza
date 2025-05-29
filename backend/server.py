@@ -473,6 +473,12 @@ async def create_video_clip(
         clip_id = str(uuid.uuid4())
         clip_name = sanitize_input(clip_request.clip_name) if clip_request.clip_name else f"Clip {clip_id[:8]}"
         
+        # Process selected features
+        applied_features = []
+        for feature in clip_request.features or []:
+            feature_result = await process_ai_feature(feature, clip_request.youtube_url, current_user)
+            applied_features.append(feature_result)
+        
         clip_record = {
             "_id": clip_id,
             "user_id": current_user["_id"],
@@ -481,20 +487,37 @@ async def create_video_clip(
             "start_time": clip_request.start_time,
             "end_time": clip_request.end_time,
             "video_info": video_info,
+            "selected_features": clip_request.features or [],
+            "applied_features": applied_features,
             "status": "processing",
             "created_at": datetime.utcnow()
         }
         
         await db.clips.insert_one(clip_record)
         
-        # For demo purposes, we'll simulate processing
-        # In production, this would be handled by a background task
+        # Simulate processing and create download URL
+        # In production, this would download the actual video segment
         clip_record["status"] = "completed"
         clip_record["download_url"] = f"/api/video/download/{clip_id}"
+        clip_record["file_path"] = f"/tmp/clip_{clip_id}.mp4"
+        
+        # Create a mock video file for download
+        mock_video_content = create_mock_video_file(clip_id, clip_record)
+        
+        # Store the mock file
+        import os
+        os.makedirs("/tmp", exist_ok=True)
+        with open(f"/tmp/clip_{clip_id}.txt", "wb") as f:
+            f.write(mock_video_content)
         
         await db.clips.update_one(
             {"_id": clip_id},
-            {"$set": {"status": "completed", "download_url": clip_record["download_url"]}}
+            {"$set": {
+                "status": "completed", 
+                "download_url": clip_record["download_url"],
+                "file_path": f"/tmp/clip_{clip_id}.txt",
+                "file_size": len(mock_video_content)
+            }}
         )
         
         return {
@@ -507,12 +530,41 @@ async def create_video_clip(
                 "start_time": clip_request.start_time,
                 "end_time": clip_request.end_time,
                 "status": "completed",
-                "download_url": clip_record["download_url"]
+                "download_url": clip_record["download_url"],
+                "applied_features": applied_features
             }
         }
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/video/download/{clip_id}")
+async def download_clip(
+    clip_id: str,
+    current_user: dict = Depends(get_current_active_user)
+):
+    # Find the clip
+    clip = await db.clips.find_one({"_id": clip_id})
+    
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+    
+    # Check if user owns the clip or is admin
+    if clip["user_id"] != current_user["_id"] and current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Check if file exists
+    file_path = clip.get("file_path")
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Clip file not found")
+    
+    # Return file for download
+    from fastapi.responses import FileResponse
+    return FileResponse(
+        path=file_path,
+        filename=f"{clip['clip_name']}.txt",
+        media_type="application/octet-stream"
+    )
 
 @app.get("/api/video/clips")
 async def get_user_clips(current_user: dict = Depends(get_current_active_user)):
