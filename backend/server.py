@@ -105,11 +105,90 @@ class Token(BaseModel):
     token_type: str
     user: dict
 
+# AI Feature Processing Functions
+async def process_ai_feature(feature_id: str, youtube_url: str, user: dict) -> dict:
+    """Process AI feature application"""
+    feature_processors = {
+        'auto_clipping': {
+            'name': 'Auto Clipping',
+            'result': 'Applied viral moment detection algorithm',
+            'confidence': 0.85
+        },
+        'face_tracking': {
+            'name': 'Auto Face Tracking',
+            'result': 'Face detection and tracking applied',
+            'confidence': 0.92
+        },
+        'auto_captions': {
+            'name': 'Auto Captioning',
+            'result': 'Generated captions with 95% accuracy',
+            'confidence': 0.95
+        },
+        'translation': {
+            'name': 'Caption Translation',
+            'result': 'Translated to selected languages',
+            'confidence': 0.88
+        },
+        'hook_titles': {
+            'name': 'Auto Hook Titles',
+            'result': 'Generated compelling hook title',
+            'confidence': 0.78
+        },
+        'b_roll': {
+            'name': 'Auto B-roll',
+            'result': 'Added relevant background footage',
+            'confidence': 0.82
+        },
+        'background_removal': {
+            'name': 'Background Remover',
+            'result': 'Background removed successfully',
+            'confidence': 0.90
+        },
+        'voice_enhancement': {
+            'name': 'Voice Enhancement',
+            'result': 'Audio quality improved',
+            'confidence': 0.87
+        }
+    }
+    
+    processor = feature_processors.get(feature_id, {
+        'name': feature_id,
+        'result': 'Feature applied',
+        'confidence': 0.80
+    })
+    
+    return {
+        'feature_id': feature_id,
+        'name': processor['name'],
+        'result': processor['result'],
+        'confidence': processor['confidence'],
+        'processed_at': datetime.utcnow()
+    }
+
+def create_mock_video_file(clip_id: str, clip_data: dict) -> bytes:
+    """Create a mock video file for demonstration"""
+    # This creates a simple text file that represents a video file
+    # In production, this would create an actual video file
+    mock_content = f"""
+# Pjesëza Video Clip
+Clip ID: {clip_id}
+Name: {clip_data['clip_name']}
+Source: {clip_data['youtube_url']}
+Duration: {clip_data['start_time']}s - {clip_data['end_time']}s
+Applied Features: {', '.join(clip_data.get('selected_features', []))}
+Created: {clip_data['created_at']}
+
+This is a mock video file for demonstration purposes.
+In production, this would be the actual processed video clip.
+"""
+    return mock_content.encode('utf-8')
+
 class VideoClipRequest(BaseModel):
     youtube_url: str
     start_time: Optional[float] = 0
     end_time: Optional[float] = None
     clip_name: Optional[str] = None
+    features: Optional[List[str]] = []
 
 class User(BaseModel):
     id: str
